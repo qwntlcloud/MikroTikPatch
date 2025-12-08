@@ -6,10 +6,12 @@ def generate_eddsa_keypair():
     private_key = ECPrivateKey.eddsa_generate(curve)
     return private_key.eddsa_encode(), private_key.pubkey.eddsa_encode()
 
+
 def generate_kcdsa_keypair():
     curve = getcurvebyname('Curve25519')
     private_key = ECPrivateKey.generate(curve)
     return Tools.inttobytes_le(private_key.scalar, 32), Tools.inttobytes_le(int(private_key.pubkey.point.x), 32)
+
 
 def lic_parse_ros(lic: str, public_key: bytes):
     assert (isinstance(public_key, bytes))
