@@ -1,5 +1,6 @@
 from mikro import *
 
+
 def generate_eddsa_keypair():
     curve = getcurvebyname('Ed25519')
     private_key = ECPrivateKey.eddsa_generate(curve)
@@ -26,6 +27,7 @@ def lic_parse_ros(lic: str, public_key: bytes):
     print(f"Signature: {signature.hex()}")
     print(f'License valid: {mikro_kcdsa_verify(licVal, nonce_hash+signature, public_key)}')
 
+
 def lic_parse_chr(lic: str, public_key: bytes):
     assert (isinstance(public_key, bytes))
     slic = lic.replace(MIKRO_LICENSE_HEADER, '').replace(
@@ -41,6 +43,7 @@ def lic_parse_chr(lic: str, public_key: bytes):
     signature = lic[32:64]
     print(f"Signature: {signature.hex()}")
     print(f'License valid: {mikro_kcdsa_verify(licVal, nonce_hash+signature, public_key)}')
+
 
 def lic_gen_ros(software_id, private_key: bytes):
     assert (isinstance(private_key, bytes))
