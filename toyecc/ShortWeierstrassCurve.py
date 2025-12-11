@@ -86,11 +86,11 @@ class ShortWeierstrassCurve(EllipticCurve, CurveOpIsomorphism, CurveOpExportSage
 
 	@property
 	def is_koblitz(self):
-		"""Returns whether the curve allows for efficient computation of a map
-		\phi in the field (i.e. that the curve is commonly known as a 'Koblitz
-		Curve'). This corresponds to examples 3 and 4 of the paper "Faster
-		Point Multiplication on Elliptic Curves with Efficient Endomorphisms"
-		by Gallant, Lambert and Vanstone."""
+#		"""Returns whether the curve allows for efficient computation of a map
+#		\phi in the field (i.e. that the curve is commonly known as a 'Koblitz
+#		Curve'). This corresponds to examples 3 and 4 of the paper "Faster
+#		Point Multiplication on Elliptic Curves with Efficient Endomorphisms"
+#		by Gallant, Lambert and Vanstone."""
 		return ((self.b == 0) and ((self.p % 4) == 1)) or ((self.a == 0) and ((self.p % 3) == 1))
 
 	@property
