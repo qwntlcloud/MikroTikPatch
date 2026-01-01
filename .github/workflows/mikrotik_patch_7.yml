@@ -160,7 +160,7 @@ jobs:
     - name: Get loader patch files
       if: steps.get_latest.outputs.has_new_version == 'true'
       run: |
-        wget -nv -O loader "https://raw.githubusercontent.com/qwntlcloud/mikrotik/main/routeros/loader"
+        wget -nv -O loader "https://raw.githubusercontent.com/qwntlcloud/MikroTikPatch/main/routeros/loader"
 
     - name: Cache mikrotik-${{ env.LATEST_VERSION }}${{ env.ARCH }}.iso
       if: steps.get_latest.outputs.has_new_version == 'true' && (matrix.arch == 'x86' || matrix.arch == 'arm64')
