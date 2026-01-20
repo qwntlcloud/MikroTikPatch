@@ -112,6 +112,7 @@ jobs:
           *.vmdk
           *.vdi
           *.img
+          *.*
           mikrotik-${{ env.LATEST_VERSION }}-patched.iso
           install-image-${{ env.LATEST_VERSION }}-patched.*.zip
           chr-${{ env.LATEST_VERSION }}-patched.*.zip
