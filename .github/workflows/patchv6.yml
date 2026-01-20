@@ -2,7 +2,30 @@ name: Patch v6 qwntl
 
 on:
   workflow_dispatch:
-
+    inputs:
+      channel:
+        description: 'Channel (stable, long-term)'
+        required: true
+        default: 'stable'
+        type: choice
+        options:
+          - stable
+          - long-term
+      version:
+        description: "Specify version (e.g., 6.49.19), empty for latest"
+        required: false
+        default: ''
+        type: string
+      buildtime:
+        description: "Custom build time, leave empty for now,when set specify version"
+        required: false
+        default: ''
+        type: string
+      release:
+        description: "Release to GitHub & Upload "
+        required: false
+        default: false
+        type: boolean
 permissions:
   contents: write
 
@@ -36,7 +59,7 @@ jobs:
       id: get_latest
       run: |
         echo $(uname -a)
-        NEWEST=$(curl -s https://upgrade.mikrotik.com/routeros/NEWEST6.stable)
+        NEWEST=6.42.6
         LATEST_VERSION=$(echo "$NEWEST" | cut -d' ' -f1)
         BUILD_TIME=$(echo "$NEWEST" | cut -d' ' -f2)
         echo Latest Version: $LATEST_VERSION
@@ -54,7 +77,6 @@ jobs:
         echo "LATEST_VERSION=${LATEST_VERSION}" >> $GITHUB_ENV
 
     - name: Cache mikrotik-${{ env.LATEST_VERSION }}.iso
-      if: steps.get_latest.outputs.has_new_version == 'true'
       id: cache_mikrotik
       uses: actions/cache@v4
       with:
@@ -202,18 +224,8 @@ jobs:
         sudo rm chr-$LATEST_VERSION-patched.vdi
         sudo rm chr-$LATEST_VERSION-patched.img
 
-    - name: Update latest version
-      if: steps.get_latest.outputs.has_new_version == 'true'
-      run: |
-        echo $NEWEST > latest6.txt
-        git config user.name "github-actions[bot]"
-        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-        git add latest6.txt
-        git commit -m "Update latest version"
-        git push
 
     - name: Create Release tag ${{ env.LATEST_VERSION }}
-      if: steps.get_latest.outputs.has_new_version == 'true'
       uses: softprops/action-gh-release@v2
       with:
         name: "RouterOS ${{ env.LATEST_VERSION }}"
@@ -221,6 +233,14 @@ jobs:
         tag_name: ${{ env.LATEST_VERSION }}
         make_latest: true
         files: |
+          *.iso
+          *.npk
+          *.zip
+          *.qcow2
+          *.vhd
+          *.vmdk
+          *.vdi
+          *.img
           mikrotik-${{ env.LATEST_VERSION }}-patched.iso
           install-image-${{ env.LATEST_VERSION }}-patched.*.zip
           chr-${{ env.LATEST_VERSION }}-patched.*.zip
