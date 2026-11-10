@@ -400,21 +400,20 @@ def patch_squashfs(path, key_dict):
 
         if 'loader' in files and os.path.isfile(os.path.join(root, 'loader')):
             loader_file = os.path.join(root, 'loader')
-            patch_loader(loader_file)
-
-        # If loader patch failed or module not available, try copy from repo
-        loader_src = os.path.join(os.getcwd(), "loader")
-        if os.path.isfile(loader_src):
-            for root, dirs, files in os.walk(path):
-                if 'loader' in files:
-                    loader_dst = os.path.join(root, 'loader')
+            # Try patch_loader first (requires loader.patch_loader module)
+            try:
+                patch_loader(loader_file)
+            except Exception as e:
+                print(f'patch_loader failed: {e}')
+                # Fallback: copy loader from repo if available
+                loader_src = os.path.join(os.getcwd(), "loader")
+                if os.path.isfile(loader_src):
                     try:
                         import shutil
-                        shutil.copy2(loader_src, loader_dst)
-                        print(f'Copied loader from repo to {loader_dst}')
-                    except Exception as e:
-                        print(f'Failed to copy loader: {e}')
-                    break
+                        shutil.copy2(loader_src, loader_file)
+                        print(f'✅ Copied working loader from repo to {loader_file}')
+                    except Exception as copy_err:
+                        print(f'❌ Failed to copy loader: {copy_err}')
 
         if 'BOOTX64.EFI' in files and os.path.isfile(os.path.join(root, 'BOOTX64.EFI')):
             efi_file = os.path.join(root, 'BOOTX64.EFI')
