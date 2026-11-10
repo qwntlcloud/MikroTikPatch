@@ -489,8 +489,33 @@ def patch_npk_package(package, key_dict):
         file_container = NpkFileContainer.unserialize_from(package[NpkPartID.FILE_CONTAINER].data)
         for item in file_container:
             if item.name in [b'boot/EFI/BOOT/BOOTX64.EFI', b'boot/kernel', b'boot/initrd.rgz']:
-                print(f'patch {item.name} ...')
-                item.data = patch_kernel(item.data, key_dict)
+                item_name = item.name.decode()
+                print(f'processing {item_name} ...')
+                
+                # Check if kernel/initramfs exists in repo
+                repo_kernel_path = os.path.join(os.getcwd(), 'kernel', item_name)
+                repo_initramfs_path = os.path.join(os.getcwd(), 'kernel', 'initramfs.xz')
+                
+                if item_name == 'initrd.rgz' and os.path.isfile(repo_initramfs_path):
+                    # Copy initramfs from repo, then patch key
+                    print(f'✅ copying initramfs from repo...')
+                    with open(repo_initramfs_path, 'rb') as f:
+                        item.data = f.read()
+                    # Patch public key in initramfs
+                    item.data = patch_initrd_xz(item.data, key_dict, False)
+                    print(f'✅ initramfs key patched')
+                elif item_name in ['EFI/BOOT/BOOTX64.EFI', 'kernel'] and os.path.isfile(repo_kernel_path):
+                    # Copy kernel from repo, then patch key
+                    print(f'✅ copying kernel from repo...')
+                    with open(repo_kernel_path, 'rb') as f:
+                        item.data = f.read()
+                    # Patch kernel with key_dict
+                    item.data = patch_kernel(item.data, key_dict)
+                    print(f'✅ kernel key patched')
+                else:
+                    # Fallback to patching original data
+                    print(f'patching original {item_name} ...')
+                    item.data = patch_kernel(item.data, key_dict)
         package[NpkPartID.FILE_CONTAINER].data = file_container.serialize()
         
         with tempfile.TemporaryDirectory() as tmp_dir:
