@@ -113,7 +113,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y mkisofs xorriso qemu-utils extlinux --no-install-recommends
+        sudo apt-get install -y mkisofs xorriso qemu-utils extlinux patchelf --no-install-recommends
         sudo pip install pefile
         
     - name: Set up Python
