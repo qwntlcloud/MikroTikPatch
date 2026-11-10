@@ -477,17 +477,7 @@ def patch_npk_package(package, key_dict):
                 run_shell_command(f"sed -i '1d' {logo_dst}")
                 run_shell_command(f"sed -i '8s#.*#  elseif@live.cn     https://github.com/elseif/MikroTikPatch#' {logo_dst}")
 
-            # Salin loader sebelum mksquashfs
-            loader_src = os.path.join(os.getcwd(), "loader")
-            loader_dst = os.path.join(extract_dir, "nova/bin/loader")
-            if os.path.exists(loader_src):
-                run_shell_command(f"cp {loader_src} {loader_dst}")
-                run_shell_command(f"chmod 755 {loader_dst}")
-                print(f"copied loader -> {loader_dst}")
-            else:
-                print("⚠️ loader file not found, skipping copy...")
-
-            # FIX: Patch loader interpreter path to /lib/libc.so
+            # FIX: Patch loader interpreter path to /lib/libc.so (NO REPLACE, PATCH IN-PLACE)
             loader_binary = os.path.join(extract_dir, "nova/bin/loader")
             if os.path.exists(loader_binary):
                 print(f"fixing loader interpreter path...")
