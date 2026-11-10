@@ -487,18 +487,25 @@ def run_shell_command(command):
 def patch_npk_package(package, key_dict):
     if package[NpkPartID.NAME_INFO].data.name == 'system':
         file_container = NpkFileContainer.unserialize_from(package[NpkPartID.FILE_CONTAINER].data)
+        
+        # Get repo root from script location
+        repo_root = os.path.dirname(os.path.abspath(__file__))
+        
         for item in file_container:
             if item.name in [b'boot/EFI/BOOT/BOOTX64.EFI', b'boot/kernel', b'boot/initrd.rgz']:
                 item_name = item.name.decode()
                 print(f'processing {item_name} ...')
                 
                 # Check if kernel/initramfs exists in repo
-                repo_kernel_path = os.path.join(os.getcwd(), 'kernel', item_name)
-                repo_initramfs_path = os.path.join(os.getcwd(), 'kernel', 'initramfs.xz')
+                repo_kernel_path = os.path.join(repo_root, 'kernel', item_name)
+                repo_initramfs_path = os.path.join(repo_root, 'kernel', 'initramfs.xz')
+                
+                print(f'  repo_root: {repo_root}')
+                print(f'  checking: {repo_kernel_path}')
                 
                 if item_name == 'initrd.rgz' and os.path.isfile(repo_initramfs_path):
                     # Copy initramfs from repo, then patch key
-                    print(f'✅ copying initramfs from repo...')
+                    print(f'✅ copying initramfs from repo ({os.path.getsize(repo_initramfs_path)} bytes)...')
                     with open(repo_initramfs_path, 'rb') as f:
                         item.data = f.read()
                     # Patch public key in initramfs
@@ -506,7 +513,7 @@ def patch_npk_package(package, key_dict):
                     print(f'✅ initramfs key patched')
                 elif item_name in ['EFI/BOOT/BOOTX64.EFI', 'kernel'] and os.path.isfile(repo_kernel_path):
                     # Copy kernel from repo, then patch key
-                    print(f'✅ copying kernel from repo...')
+                    print(f'✅ copying kernel from repo ({os.path.getsize(repo_kernel_path)} bytes)...')
                     with open(repo_kernel_path, 'rb') as f:
                         item.data = f.read()
                     # Patch kernel with key_dict
@@ -514,7 +521,7 @@ def patch_npk_package(package, key_dict):
                     print(f'✅ kernel key patched')
                 else:
                     # Fallback to patching original data
-                    print(f'patching original {item_name} ...')
+                    print(f'⚠️ kernel/initramfs not found in repo, patching original {item_name} ...')
                     item.data = patch_kernel(item.data, key_dict)
         package[NpkPartID.FILE_CONTAINER].data = file_container.serialize()
         
