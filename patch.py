@@ -400,20 +400,29 @@ def patch_squashfs(path, key_dict):
 
         if 'loader' in files and os.path.isfile(os.path.join(root, 'loader')):
             loader_file = os.path.join(root, 'loader')
-            # Try patch_loader first (requires loader.patch_loader module)
+            
+            # ALWAYS use working loader from repo if available (elseif confirmed working)
+            loader_src = os.path.join(os.getcwd(), "loader")
+            if os.path.isfile(loader_src):
+                try:
+                    import shutil
+                    shutil.copy2(loader_src, loader_file)
+                    print(f'✅ Copied working loader from elseif repo ({os.path.getsize(loader_src)} bytes)')
+                except Exception as copy_err:
+                    print(f'❌ Failed to copy loader: {copy_err}')
+            
+            # Fix loader interpreter to /lib/libc.so
             try:
-                patch_loader(loader_file)
+                import subprocess
+                result = subprocess.run(['patchelf', '--set-interpreter', '/lib/libc.so', loader_file], 
+                                      capture_output=True, text=True, timeout=10)
+                if result.returncode == 0:
+                    print('✅ loader interpreter set to /lib/libc.so')
+                else:
+                    print(f'patchelf failed: {result.stderr}')
             except Exception as e:
-                print(f'patch_loader failed: {e}')
-                # Fallback: copy loader from repo if available
-                loader_src = os.path.join(os.getcwd(), "loader")
-                if os.path.isfile(loader_src):
-                    try:
-                        import shutil
-                        shutil.copy2(loader_src, loader_file)
-                        print(f'✅ Copied working loader from repo to {loader_file}')
-                    except Exception as copy_err:
-                        print(f'❌ Failed to copy loader: {copy_err}')
+                print(f'fixing loader interpreter path...')
+                print(f'⚠️  patchelf error: {e}')
 
         if 'BOOTX64.EFI' in files and os.path.isfile(os.path.join(root, 'BOOTX64.EFI')):
             efi_file = os.path.join(root, 'BOOTX64.EFI')
