@@ -59,7 +59,7 @@ env:
   CUSTOM_CLOUD_URL: cloud2.mikrotik.com
   LOADER_URL: file.wacit.my.id
   LOADER_PASSWORD: mad1337
-  MIKROTIK_URL: mikrotik.com
+  MIKROTIK_URL: download.mikrotik.com
 
 jobs:
   Set_Variables:
