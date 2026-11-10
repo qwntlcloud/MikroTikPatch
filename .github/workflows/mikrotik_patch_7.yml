@@ -187,6 +187,7 @@ jobs:
         sudo cp new_iso/routeros-$LATEST_VERSION*.npk routeros-$LATEST_VERSION$ARCH.npk
         sudo mkdir efiboot
         # Resize efiboot.img to 60MB (original ~35MB, need space for 36MB initramfs.xz)
+        sudo chmod +w new_iso/efiboot.img
         sudo dd if=/dev/zero bs=1M count=25 >> new_iso/efiboot.img
         sudo e2fsck -f -y new_iso/efiboot.img || true
         sudo resize2fs new_iso/efiboot.img || true
