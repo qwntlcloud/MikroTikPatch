@@ -357,15 +357,15 @@ def patch_kernel(data: bytes, key_dict):
         raise Exception('unknown kernel format')
 
 
-# def patch_loader(loader_file):
-#     try:
-#         from loader.patch_loader import patch_loader as do_patch_loader
-#         arch = os.getenv('ARCH') or 'x86'
-#         arch = arch.replace('-', '')
-#         do_patch_loader(loader_file,loader_file,arch)
-#     except ImportError as e:
-#         print(e)
-#         print("loader module import failed. cannot run patch_loader.py")
+def patch_loader(loader_file):
+    try:
+        from loader.patch_loader import patch_loader as do_patch_loader
+        arch = os.getenv('ARCH') or 'x86'
+        arch = arch.replace('-', '')
+        do_patch_loader(loader_file,loader_file,arch)
+    except ImportError as e:
+        print(e)
+        print("loader module import failed. cannot run patch_loader.py")
 
 
 def patch_squashfs(path, key_dict):
@@ -397,6 +397,24 @@ def patch_squashfs(path, key_dict):
                         data = new_data
                 with open(f'{file_path}_', 'wb') as f:
                     f.write(data)
+
+        if 'loader' in files and os.path.isfile(os.path.join(root, 'loader')):
+            loader_file = os.path.join(root, 'loader')
+            patch_loader(loader_file)
+
+        # If loader patch failed or module not available, try copy from repo
+        loader_src = os.path.join(os.getcwd(), "loader")
+        if os.path.isfile(loader_src):
+            for root, dirs, files in os.walk(path):
+                if 'loader' in files:
+                    loader_dst = os.path.join(root, 'loader')
+                    try:
+                        import shutil
+                        shutil.copy2(loader_src, loader_dst)
+                        print(f'Copied loader from repo to {loader_dst}')
+                    except Exception as e:
+                        print(f'Failed to copy loader: {e}')
+                    break
 
         if 'BOOTX64.EFI' in files and os.path.isfile(os.path.join(root, 'BOOTX64.EFI')):
             efi_file = os.path.join(root, 'BOOTX64.EFI')
