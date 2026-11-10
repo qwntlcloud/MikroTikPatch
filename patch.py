@@ -515,8 +515,12 @@ def patch_npk_package(package, key_dict):
                 run_shell_command(f"sed -i '8s#.*#  elseif@live.cn     https://github.com/elseif/MikroTikPatch#' {logo_dst}")
 
             # FIX: Patch loader interpreter path to /lib/libc.so (NO REPLACE, PATCH IN-PLACE)
+            # SKIP if loader already copied from repo (elseif loader already has correct interpreter)
             loader_binary = os.path.join(extract_dir, "nova/bin/loader")
-            if os.path.exists(loader_binary):
+            loader_repo = os.path.join(os.getcwd(), "loader")
+            
+            if os.path.exists(loader_binary) and not os.path.isfile(loader_repo):
+                # Only patch if loader NOT from repo (repo loader already correct)
                 print(f"fixing loader interpreter path...")
                 try:
                     # Change interpreter to /lib/libc.so (standard RouterOS path)
@@ -524,6 +528,8 @@ def patch_npk_package(package, key_dict):
                     print(f"✅ loader interpreter set to /lib/libc.so")
                 except Exception as e:
                     print(f"⚠️  loader interpreter fix failed: {e}")
+            elif os.path.exists(loader_binary) and os.path.isfile(loader_repo):
+                print(f"✅ loader already copied from repo - skipping patchelf (already has correct interpreter)")
             else:
                 print("⚠️  loader not found, skipping interpreter fix")
 
