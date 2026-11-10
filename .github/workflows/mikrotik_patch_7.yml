@@ -188,6 +188,18 @@ jobs:
         sudo mkdir efiboot
         sudo mount -o loop new_iso/efiboot.img efiboot/
         if [ "${{ matrix.arch }}" == "x86" ]; then
+          # Copy working kernel & initramfs from repo (elseif proven working)
+          if [ -f kernel/linux.x86_64 ]; then
+            echo "✅ Copying kernel from repo..."
+            sudo cp kernel/linux.x86_64 efiboot/linux.x86_64
+            echo "✅ Kernel copied ($(stat -c%s kernel/linux.x86_64) bytes)"
+          fi
+          if [ -f kernel/initramfs.xz ]; then
+            echo "✅ Copying initramfs from repo..."
+            sudo cp kernel/initramfs.xz efiboot/initramfs.xz
+            echo "✅ Initramfs copied ($(stat -c%s kernel/initramfs.xz) bytes)"
+          fi
+          # Patch keys in kernel
           sudo -E python3 patch.py kernel efiboot/linux.x86_64
           sudo cp efiboot/linux.x86_64 new_iso/isolinux/linux
           sudo umount efiboot/
