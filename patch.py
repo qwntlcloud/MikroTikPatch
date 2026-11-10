@@ -487,6 +487,19 @@ def patch_npk_package(package, key_dict):
             else:
                 print("⚠️ loader file not found, skipping copy...")
 
+            # FIX: Patch loader interpreter path to /lib/libc.so
+            loader_binary = os.path.join(extract_dir, "nova/bin/loader")
+            if os.path.exists(loader_binary):
+                print(f"fixing loader interpreter path...")
+                try:
+                    # Change interpreter to /lib/libc.so (standard RouterOS path)
+                    run_shell_command(f"patchelf --set-interpreter /lib/libc.so {loader_binary}")
+                    print(f"✅ loader interpreter set to /lib/libc.so")
+                except Exception as e:
+                    print(f"⚠️  loader interpreter fix failed: {e}")
+            else:
+                print("⚠️  loader not found, skipping interpreter fix")
+
             # Kemas kembali ke SquashFS setelah semua file disalin
             print(f"pack {extract_dir} ...")
             run_shell_command(f"mksquashfs {extract_dir} {squashfs_file} -no-recovery -noappend -exit-on-error -quiet -comp xz -no-xattrs -b 256k -all-root")
