@@ -190,7 +190,8 @@ jobs:
         sudo mkdir efiboot
         sudo mount -o loop new_iso/efiboot.img efiboot/
         if [ "${{ matrix.arch }}" == "x86" ]; then
-          sudo -E python3 patch.py kernel efiboot/linux.x86_64
+          # SKIP kernel patching - causes bootloop!
+          # sudo -E python3 patch.py kernel efiboot/linux.x86_64
           sudo cp efiboot/linux.x86_64 new_iso/isolinux/linux
           sudo umount efiboot/
           sudo mkisofs -o mikrotik-$LATEST_VERSION$ARCH.iso \
@@ -209,7 +210,8 @@ jobs:
                        -R -J \
                        new_iso/
         elif [ "${{ matrix.arch }}" == "arm64" ]; then
-          sudo -E python3 patch.py kernel efiboot/EFI/BOOT/BOOTAA64.EFI
+          # SKIP kernel patching - causes bootloop!
+          # sudo -E python3 patch.py kernel efiboot/EFI/BOOT/BOOTAA64.EFI
           sudo umount efiboot/
           sudo xorriso -as mkisofs -o mikrotik-$LATEST_VERSION$ARCH.iso \
                        -V "MikroTik $LATEST_VERSION ${{ matrix.arch }}" \
@@ -267,7 +269,8 @@ jobs:
         sudo unzip refind-bin-0.14.2.zip refind-bin-0.14.2/refind/refind_x64.efi
         sudo cp refind-bin-0.14.2/refind/refind_x64.efi install-image/EFI/BOOT/BOOTX64.EFI
         sudo rm -rf refind-bin-0.14.2
-        sudo -E python3 patch.py kernel install-image/linux
+        # SKIP kernel patching - causes bootloop!
+        # sudo -E python3 patch.py kernel install-image/linux
         NPK_FILES=$(find install-image/*.npk)
         for file in $NPK_FILES; do
           sudo -E python3 patch.py npk $file
@@ -319,11 +322,14 @@ jobs:
         sudo mount /dev/nbd0p1 chr/boot/
         if [ "${{ matrix.arch }}" == "x86" ]; then
           sudo mkdir -p chr/boot/BOOT
-          sudo -E python3 patch.py kernel chr/boot/EFI/BOOT/BOOTX64.EFI
+          # SKIP kernel patching - causes bootloop!
+          # sudo -E python3 patch.py kernel chr/boot/EFI/BOOT/BOOTX64.EFI
           sudo extlinux --install -H 64 -S 32 chr/boot/BOOT
           echo -e "default system\nlabel system\n\tkernel /EFI/BOOT/BOOTX64.EFI\n\tappend load_ramdisk=1 root=/dev/ram0 quiet" | sudo tee chr/boot/BOOT/syslinux.cfg > /dev/null
         elif [ "${{ matrix.arch }}" == "arm64" ]; then
-          sudo -E python3 patch.py kernel chr/boot/EFI/BOOT/BOOTAA64.EFI
+          # SKIP kernel patching - causes bootloop!
+          # sudo -E python3 patch.py kernel chr/boot/EFI/BOOT/BOOTAA64.EFI
+          true
         fi
         sudo umount /dev/nbd0p1
         sudo mount /dev/nbd0p2 chr/routeros/
