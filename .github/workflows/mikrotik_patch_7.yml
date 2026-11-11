@@ -186,34 +186,11 @@ jobs:
         done
         sudo cp new_iso/routeros-$LATEST_VERSION*.npk routeros-$LATEST_VERSION$ARCH.npk
         sudo mkdir efiboot
-        # Mount original efiboot.img to copy files
         sudo mount -o loop new_iso/efiboot.img efiboot/
-        
-        # Create new larger efiboot.img (60MB FAT filesystem)
-        dd if=/dev/zero of=new_efiboot.img bs=1M count=60
-        sudo mkfs.vfat -F 32 -n ROUTEROS new_efiboot.img
-        
-        # Mount new image and copy all files from original
-        sudo mkdir efiboot_new
-        sudo mount -o loop new_efiboot.img efiboot_new/
-        sudo cp -a efiboot/* efiboot_new/ 2>/dev/null || true
-        
         if [ "${{ matrix.arch }}" == "x86" ]; then
-          # Copy working kernel & initramfs from repo (elseif proven working)
-          if [ -f kernel/linux.x86_64 ]; then
-            echo "✅ Copying kernel from repo..."
-            sudo cp kernel/linux.x86_64 efiboot_new/linux.x86_64
-            echo "✅ Kernel copied ($(stat -c%s kernel/linux.x86_64) bytes)"
-          fi
-          # NO initramfs - using madskid approach (initramfs from system.npk)
-          echo "ℹ️ NOT copying initramfs - using madskid approach (initramfs in system.npk)"
-          # Patch keys in kernel
-          sudo -E python3 patch.py kernel efiboot_new/linux.x86_64
-          sudo cp efiboot_new/linux.x86_64 new_iso/isolinux/linux
+          sudo -E python3 patch.py kernel efiboot/linux.x86_64
+          sudo cp efiboot/linux.x86_64 new_iso/isolinux/linux
           sudo umount efiboot/
-          sudo umount efiboot_new/
-          sudo mv new_efiboot.img new_iso/efiboot.img
-          sudo rmdir efiboot_new
           sudo mkisofs -o mikrotik-$LATEST_VERSION$ARCH.iso \
                        -V "MikroTik $LATEST_VERSION $ARCH" \
                        -sysid "" -preparer "MiKroTiK" \
