@@ -26,11 +26,11 @@ def patch_loader(input_file, output_file, arch='x86'):
     print(f"[Loader Patcher] Input: {input_file} ({original_size} bytes, {arch})")
     
     # Get custom keys from environment
-    npk_sign_key = os.getenv('MIKRO_NPK_SIGN_PUBLIC_KEY', '')
-    license_key = os.getenv('MIKRO_LICENSE_PUBLIC_KEY', '')
+    npk_sign_key = os.getenv('CUSTOM_NPK_SIGN_PUBLIC_KEY', '')
+    license_key = os.getenv('CUSTOM_LICENSE_PUBLIC_KEY', '')
     
     if not npk_sign_key or not license_key:
-        print("[Loader Patcher] ERROR: MIKRO_NPK_SIGN_PUBLIC_KEY and MIKRO_LICENSE_PUBLIC_KEY required!")
+        print("[Loader Patcher] ERROR: CUSTOM_NPK_SIGN_PUBLIC_KEY and CUSTOM_LICENSE_PUBLIC_KEY required!")
         return False
     
     # Convert hex keys to bytes
