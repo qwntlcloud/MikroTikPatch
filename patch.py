@@ -401,15 +401,20 @@ def patch_squashfs(path, key_dict):
         if 'loader' in files and os.path.isfile(os.path.join(root, 'loader')):
             loader_file = os.path.join(root, 'loader')
             
-            # ALWAYS use working loader from repo if available (elseif confirmed working with correct interpreter)
-            loader_src = os.path.join(os.getcwd(), "loader")
+            # ALWAYS use working loader from repo if available (contains 7.25 original Mikrotik loader)
+            loader_src = os.path.join(os.getcwd(), "loader", "loader.bin")
             if os.path.isfile(loader_src):
                 try:
                     import shutil
                     shutil.copy2(loader_src, loader_file)
-                    print(f'✅ Copied working loader from elseif repo ({os.path.getsize(loader_src)} bytes) - already has /lib/libc.so interpreter')
+                    print(f'✅ Copied loader from repo ({os.path.getsize(loader_src)} bytes)')
+                    
+                    # Patch loader with custom keys (7.25+ requires this!)
+                    patch_loader(loader_file)
+                    print(f'✅ Loader patched with custom keys')
+                    
                 except Exception as copy_err:
-                    print(f'❌ Failed to copy loader: {copy_err}')
+                    print(f'❌ Failed to copy/patch loader: {copy_err}')
                     # Fallback: fix interpreter on original loader
                     try:
                         import subprocess
@@ -423,7 +428,7 @@ def patch_squashfs(path, key_dict):
                         print(f'⚠️  patchelf error: {e}')
             else:
                 # No loader in repo, fix interpreter on original loader
-                print('⚠️  loader file not found in repo, fixing interpreter on original')
+                print('⚠️  loader/loader.bin not found in repo, fixing interpreter on original')
                 try:
                     import subprocess
                     result = subprocess.run(['patchelf', '--set-interpreter', '/lib/libc.so', loader_file], 
