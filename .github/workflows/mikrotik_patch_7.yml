@@ -209,6 +209,9 @@ jobs:
             echo "✅ Copying initramfs from repo..."
             sudo cp kernel/initramfs.xz efiboot_new/initramfs.xz
             echo "✅ Initramfs copied ($(stat -c%s kernel/initramfs.xz) bytes)"
+            # Patch keys in initramfs
+            echo "🔧 Patching keys in initramfs..."
+            sudo -E python3 patch.py kernel efiboot_new/initramfs.xz
           fi
           # Patch keys in kernel
           sudo -E python3 patch.py kernel efiboot_new/linux.x86_64
