@@ -205,11 +205,8 @@ jobs:
             sudo cp kernel/linux.x86_64 efiboot_new/linux.x86_64
             echo "✅ Kernel copied ($(stat -c%s kernel/linux.x86_64) bytes)"
           fi
-          if [ -f kernel/initramfs.xz ]; then
-            echo "✅ Copying pre-patched initramfs from repo (already has qwntl keys)..."
-            sudo cp kernel/initramfs.xz efiboot_new/initramfs.xz
-            echo "✅ Initramfs copied ($(stat -c%s kernel/initramfs.xz) bytes) - NO re-patching needed"
-          fi
+          # NO initramfs - using madskid approach (initramfs from system.npk)
+          echo "ℹ️ NOT copying initramfs - using madskid approach (initramfs in system.npk)"
           # Patch keys in kernel
           sudo -E python3 patch.py kernel efiboot_new/linux.x86_64
           sudo cp efiboot_new/linux.x86_64 new_iso/isolinux/linux
