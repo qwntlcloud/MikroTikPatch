@@ -577,8 +577,18 @@ def patch_npk_file(key_dict, kcdsa_private_key, eddsa_private_key, input_file, o
     if len(npk._packages) > 0:
         for package in npk._packages:
             patch_npk_package(package, key_dict)
+            # Also patch NPK part data for public keys
+            for part in package._parts:
+                if part.data:
+                    for old_key, new_key in key_dict.items():
+                        part.data = replace_key(old_key, new_key, part.data, f'npk_part_{part.id}')
     else:
         patch_npk_package(npk, key_dict)
+        # Also patch NPK part data for public keys
+        for part in npk._parts:
+            if part.data:
+                for old_key, new_key in key_dict.items():
+                    part.data = replace_key(old_key, new_key, part.data, f'npk_part_{part.id}')
     npk.sign(kcdsa_private_key, eddsa_private_key)
     npk.save(output_file or input_file)
 
