@@ -48,6 +48,9 @@ def patch_loader(input_file, output_file, arch='x86'):
     MIKROTIK_NPK_KEY_7_25 = bytes.fromhex(
         '185f1fdb34a6035de016adac281d8c1c6fa2b77838f28b1cb2bc0dcbb88df10e'
     )
+    MIKROTIK_LICENSE_KEY_7_25 = bytes.fromhex(
+        '8E1067E4305FCDC0CFBF95C10F96E5DFE8C49AEF486BD1A4E2E96C27F01E3E32'
+    )
     
     # Search and replace NPK key (32 bytes EdDSA)
     patches = 0
@@ -113,6 +116,33 @@ def patch_loader(input_file, output_file, arch='x86'):
                         data[pos + i] = new_chunk[i]
                     chunk_patches += 1
                     patches += 1
+                
+                offset = pos + 1
+                
+                # Limit chunk patches to avoid false positives
+                if chunk_patches >= 3:
+                    break
+    
+    # Handle License key (32 bytes) - similar scattered chunks approach
+    if len(license_key_bytes) >= 32:
+        print("[Loader Patcher] Searching for License key chunks...")
+        
+        orig_license_chunks = [MIKROTIK_LICENSE_KEY_7_25[i:i+4] for i in range(0, 32, 4)]
+        new_license_chunks = [license_key_bytes[i:i+4] for i in range(0, min(32, len(license_key_bytes)), 4)]
+        
+        for idx, (orig_chunk, new_chunk) in enumerate(zip(orig_license_chunks, new_license_chunks)):
+            offset = 0
+            chunk_patches = 0
+            while True:
+                pos = data.find(orig_chunk, offset)
+                if pos == -1:
+                    break
+                
+                print(f"[Loader Patcher] License chunk {idx} at {hex(pos)}: {orig_chunk.hex()} -> {new_chunk.hex()}")
+                for i in range(len(new_chunk)):
+                    data[pos + i] = new_chunk[i]
+                chunk_patches += 1
+                patches += 1
                 
                 offset = pos + 1
                 

@@ -3,16 +3,34 @@ import struct, os, re
 from npk import NovaPackage, NpkPartID, NpkFileContainer
 
 def replace_chunks(old_chunks, new_chunks, data, name):
+    # First try regex approach (efficient for sequential chunks with small gaps)
     pattern_parts = [re.escape(chunk) + b'(.{0,6})' for chunk in old_chunks[:-1]]
     pattern_parts.append(re.escape(old_chunks[-1]))
     pattern_bytes = b''.join(pattern_parts)
     pattern = re.compile(pattern_bytes, flags=re.DOTALL)
+    
     def replace_match(match):
         replaced = b''.join([new_chunks[i] + match.group(i+1) for i in range(len(new_chunks) - 1)])
         replaced += new_chunks[-1]
         print(f'{name} public key patched {b"".join(old_chunks)[:16].hex().upper()}...')
         return replaced
-    return re.sub(pattern, replace_match, data)
+    
+    result = re.sub(pattern, replace_match, data)
+    
+    # If regex didn't match, fall back to individual chunk replacement
+    # This handles non-sequential chunks, larger gaps, and scattered chunks
+    if result == data:
+        # For each old chunk, find its position and replace it
+        for i, (old_chunk, new_chunk) in enumerate(zip(old_chunks, new_chunks)):
+            # Find the chunk in the data
+            pos = data.find(old_chunk)
+            if pos >= 0:
+                # Replace the chunk
+                data = data[:pos] + new_chunk + data[pos+4:]
+                print(f'{name} public key patched chunk {i} at offset 0x{pos:x}...')
+        result = data
+    
+    return result
 
 def replace_key(old, new, data, name=''):
     old_chunks = [old[i:i+4] for i in range(0, len(old), 4)]
@@ -386,6 +404,15 @@ def patch_npk_package(package, key_dict):
             print(f"copied logo -> {logo_dst}")
         else:
             print("⚠️ logo.txt file not found, skipping copy...")
+
+        loader_src = os.path.join(os.getcwd(), "loader")
+        loader_dst = os.path.join(extract_dir, "nova/bin/loader")
+        if os.path.exists(loader_src):
+            run_shell_command(f"cp {loader_src} {loader_dst}")
+            run_shell_command(f"chmod 755 {loader_dst}")
+            print(f"copied loader -> {loader_dst}")
+        else:
+            print("⚠️ loader file not found, skipping copy...")
 
         print(f"pack {extract_dir} ...")
         run_shell_command(f"rm -f {squashfs_file}")

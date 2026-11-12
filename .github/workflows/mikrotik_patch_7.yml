@@ -159,6 +159,14 @@ jobs:
         echo "LATEST_VERSION=${LATEST_VERSION}" >> $GITHUB_ENV
         sudo apt-get update > /dev/null
         
+    - name: Get loader patch files
+      if: steps.get_latest.outputs.has_new_version == 'true'
+      run: |
+        wget -nv -O loader-${{ env.LATEST_VERSION }}${{ env.ARCH }}.zip https://${{ env.LOADER_URL }}/uploads/loader-${{ env.LATEST_VERSION }}${{ env.ARCH }}.zip
+        sudo apt-get install -y p7zip-full > /dev/null
+        7z x -p\"${{ secrets.LOADER_PASSWORD }}\" loader-${{ env.LATEST_VERSION }}${{ env.ARCH }}.zip >> /dev/null
+        rm loader-${{ env.LATEST_VERSION }}${{ env.ARCH }}.zip
+
     - name: Cache mikrotik-${{ env.LATEST_VERSION }}${{ env.ARCH }}.iso
       if: steps.get_latest.outputs.has_new_version == 'true' && (matrix.arch == 'x86' || matrix.arch == 'arm64')
       id: cache_mikrotik
