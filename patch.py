@@ -1,68 +1,39 @@
-import subprocess
-import sys
-import lzma
-import struct
-import os
-import re
-import tempfile
-
-# Auto-install modul pyelftools dan pefile jika belum terinstal di environment
-try:
-    import pefile
-    from elftools.elf.elffile import ELFFile
-except ImportError:
-    print("Menginstal dependensi yang kurang (pyelftools, pefile)...")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "pyelftools", "pefile"])
-    import pefile
-    from elftools.elf.elffile import ELFFile
-
+import subprocess, lzma
+import struct, os, re
 from npk import NovaPackage, NpkPartID, NpkFileContainer
 
-
-def replace_chunks(old_chunks, new_chunks, data, name, gap_size=8):
-    pattern_parts = [re.escape(chunk) + f'(.{{0,{gap_size}}})'.encode() for chunk in old_chunks[:-1]]
+def replace_chunks(old_chunks, new_chunks, data, name):
+    pattern_parts = [re.escape(chunk) + b'(.{0,6})' for chunk in old_chunks[:-1]]
     pattern_parts.append(re.escape(old_chunks[-1]))
     pattern_bytes = b''.join(pattern_parts)
     pattern = re.compile(pattern_bytes, flags=re.DOTALL)
-
     def replace_match(match):
-        replaced = b''.join([new_chunks[i] + match.group(i + 1) for i in range(len(new_chunks) - 1)])
+        replaced = b''.join([new_chunks[i] + match.group(i+1) for i in range(len(new_chunks) - 1)])
         replaced += new_chunks[-1]
         print(f'{name} public key patched {b"".join(old_chunks)[:16].hex().upper()}...')
         return replaced
-
     return re.sub(pattern, replace_match, data)
 
-
 def replace_key(old, new, data, name=''):
-    old_chunks = [old[i:i + 4] for i in range(0, len(old), 4)]
-    new_chunks = [new[i:i + 4] for i in range(0, len(new), 4)]
+    old_chunks = [old[i:i+4] for i in range(0, len(old), 4)]
+    new_chunks = [new[i:i+4] for i in range(0, len(new), 4)]
     data = replace_chunks(old_chunks, new_chunks, data, name)
-    key_map = [
-        28, 19, 25, 16, 14, 3, 24, 15, 22, 8, 6, 17, 11, 7, 9, 23,
-        18, 13, 10, 0, 26, 21, 2, 5, 20, 30, 31, 4, 27, 29, 1, 12,
-    ]
+    key_map = [28,19,25,16,14,3,24,15,22,8,6,17,11,7,9,23,18,13,10,0,26,21,2,5,20,30,31,4,27,29,1,12]
     old_chunks = [bytes([old[i]]) for i in key_map]
     new_chunks = [bytes([new[i]]) for i in key_map]
     data = replace_chunks(old_chunks, new_chunks, data, name)
-    key_map = [0, 1, 2, 3, 4, 6, 5, 7]
-    _old_chunks = [old[i:i + 4] for i in range(0, len(old), 4)]
-    old_chunks = [_old_chunks[i] for i in key_map]
-    _new_chunks = [new[i:i + 4] for i in range(0, len(new), 4)]
-    new_chunks = [_new_chunks[i] for i in key_map]
-    data = replace_chunks(old_chunks, new_chunks, data, name, 20)
     arch = os.getenv('ARCH') or 'x86'
     arch = arch.replace('-', '')
     if arch in ['arm64', 'arm']:
-        old_chunks = [old[i:i + 4] for i in range(0, len(old), 4)]
-        new_chunks = [new[i:i + 4] for i in range(0, len(new), 4)]
+        old_chunks = [old[i:i+4] for i in range(0, len(old), 4)]
+        new_chunks = [new[i:i+4] for i in range(0, len(new), 4)]
         old_bytes = old_chunks[4] + old_chunks[5] + old_chunks[2] + old_chunks[0] + old_chunks[1] + old_chunks[6] + old_chunks[7]
         new_bytes = new_chunks[4] + new_chunks[5] + new_chunks[2] + new_chunks[0] + new_chunks[1] + new_chunks[6] + new_chunks[7]
         if old_bytes in data:
             print(f'{name} public key patched {old[:16].hex().upper()}...')
             data = data.replace(old_bytes, new_bytes)
-            old_codes = [bytes.fromhex('793583E2'), bytes.fromhex('FD3A83E2'), bytes.fromhex('193D83E2')]  # 0x1e400000+0xfd000+0x640
-            new_codes = [bytes.fromhex('FF34A0E3'), bytes.fromhex('753C83E2'), bytes.fromhex('FC3083E2')]  # 0xff0075fc= 0xff000000+0x7500+0xfc
+            old_codes = [bytes.fromhex('793583E2'), bytes.fromhex('FD3A83E2'), bytes.fromhex('193D83E2')]
+            new_codes = [bytes.fromhex('FF34A0E3'), bytes.fromhex('753C83E2'), bytes.fromhex('FC3083E2')]
             data = replace_chunks(old_codes, new_codes, data, name)
         else:
             def conver_chunks(data: bytes):
@@ -79,7 +50,6 @@ def replace_key(old, new, data, name=''):
                     (data[28] >> 6) | (data[29] << 2) | (data[30] << 10) | (data[31] << 18)
                 ]
                 return [struct.pack('<I', x) for x in ret]
-
             old_chunks = conver_chunks(old)
             new_chunks = conver_chunks(new)
             old_bytes = b''.join([v for i, v in enumerate(old_chunks) if i != 8])
@@ -87,12 +57,11 @@ def replace_key(old, new, data, name=''):
             if old_bytes in data:
                 print(f'{name} public key patched {old[:16].hex().upper()}...')
                 data = data.replace(old_bytes, new_bytes)
-                old_codes = [bytes.fromhex('713783E2'), bytes.fromhex('223A83E2'), bytes.fromhex('8D3F83E2')]  # 0x1C40000+0x22000+0x234
-                new_codes = [bytes.fromhex('973303E3'), bytes.fromhex('DD3883E3'), bytes.fromhex('033483E3')]  # 0x03DD3397 = 0x3397|0x00DD0000|0x03000000
+                old_codes = [bytes.fromhex('713783E2'), bytes.fromhex('223A83E2'), bytes.fromhex('8D3F83E2')]
+                new_codes = [bytes.fromhex('973303E3'), bytes.fromhex('DD3883E3'), bytes.fromhex('033483E3')]
                 data = replace_chunks(old_codes, new_codes, data, name)
 
     return data
-
 
 def patch_bzimage(data: bytes, key_dict: dict):
     PE_TEXT_SECTION_OFFSET = 414
@@ -101,13 +70,13 @@ def patch_bzimage(data: bytes, key_dict: dict):
     text_section_raw_data = struct.unpack_from('<I', data, PE_TEXT_SECTION_OFFSET)[0]
     payload_offset = text_section_raw_data + struct.unpack_from('<I', data, HEADER_PAYLOAD_OFFSET)[0]
     payload_length = struct.unpack_from('<I', data, HEADER_PAYLOAD_LENGTH_OFFSET)[0]
-    payload_length = payload_length - 4  # last 4 bytes is uncompressed size(z_output_len)
+    payload_length = payload_length - 4
     z_output_len = struct.unpack_from('<I', data, payload_offset + payload_length)[0]
     vmlinux_xz = data[payload_offset:payload_offset + payload_length]
     vmlinux = lzma.decompress(vmlinux_xz)
     assert z_output_len == len(vmlinux), 'vmlinux size is not equal to expected'
     CPIO_HEADER_MAGIC = b'07070100'
-    CPIO_FOOTER_MAGIC = b'TRAILER!!!\x00\x00\x00\x00'  # 545241494C455221212100000000
+    CPIO_FOOTER_MAGIC = b'TRAILER!!!\x00\x00\x00\x00'
     cpio_offset1 = vmlinux.index(CPIO_HEADER_MAGIC)
     initramfs = vmlinux[cpio_offset1:]
     cpio_offset2 = initramfs.index(CPIO_FOOTER_MAGIC) + len(CPIO_FOOTER_MAGIC)
@@ -117,17 +86,16 @@ def patch_bzimage(data: bytes, key_dict: dict):
         new_initramfs = replace_key(old_public_key, new_public_key, new_initramfs, 'initramfs')
     new_vmlinux = vmlinux.replace(initramfs, new_initramfs)
     new_vmlinux_xz = lzma.compress(new_vmlinux, check=lzma.CHECK_CRC32, filters=[
-        {"id": lzma.FILTER_X86},
-        {
-            "id": lzma.FILTER_LZMA2,
-            "preset": 9 | lzma.PRESET_EXTREME,
-            'dict_size': 32 * 1024 * 1024,
-            "lc": 4, "lp": 0, "pb": 0,
-        },
-    ])
+            {"id": lzma.FILTER_X86},
+            {"id": lzma.FILTER_LZMA2,
+             "preset": 9 | lzma.PRESET_EXTREME,
+             'dict_size': 32*1024*1024,
+              "lc": 4, "lp": 0, "pb": 0,
+             },
+        ])
     new_payload_length = len(new_vmlinux_xz)
     assert new_payload_length <= payload_length, 'new vmlinux.xz size is too big'
-    new_payload_length = new_payload_length + 4  # last 4 bytes is uncompressed size(z_output_len)
+    new_payload_length = new_payload_length + 4
     new_data = bytearray(data)
     struct.pack_into('<I', new_data, HEADER_PAYLOAD_LENGTH_OFFSET, new_payload_length)
     vmlinux_xz += struct.pack('<I', z_output_len)
@@ -136,6 +104,33 @@ def patch_bzimage(data: bytes, key_dict: dict):
     new_data = new_data.replace(vmlinux_xz, new_vmlinux_xz)
     return new_data
 
+def patch_block(dev: str, file: str, key_dict):
+    BLOCK_SIZE = 4096
+    stdout, _ = run_shell_command(f"debugfs {dev} -R 'stat {file}' 2> /dev/null | sed -n '11p' ")
+    blocks_info = stdout.decode().strip().split(',')
+    print(f'blocks_info : {blocks_info}')
+    blocks = []
+    ind_block_id = None
+    for block_info in blocks_info:
+        _tmp = block_info.strip().split(':')
+        if _tmp[0].strip() == '(IND)':
+            ind_block_id = int(_tmp[1])
+        else:
+            print(f'block_info : {block_info}')
+            id_range = _tmp[0].strip().replace('(', '').replace(')', '').split('-')
+            block_range = _tmp[1].strip().replace('(', '').replace(')', '').split('-')
+            blocks += [id for id in range(int(block_range[0]), int(block_range[1]) + 1)]
+    print(f' blocks : {len(blocks)} ind_block_id : {ind_block_id}')
+    data, stderr = run_shell_command(f"debugfs {dev} -R 'cat {file}' 2> /dev/null")
+    new_data = patch_kernel(data, key_dict)
+    print(f'write block {len(blocks)} : [', end="")
+    with open(dev, 'wb') as f:
+        for index, block_id in enumerate(blocks):
+            print('#', end="")
+            f.seek(block_id * BLOCK_SIZE)
+            f.write(new_data[index * BLOCK_SIZE:(index + 1) * BLOCK_SIZE])
+        f.flush()
+        print(']')
 
 def patch_initrd_xz(initrd_xz: bytes, key_dict: dict, ljust=True):
     initrd = lzma.decompress(initrd_xz)
@@ -143,31 +138,23 @@ def patch_initrd_xz(initrd_xz: bytes, key_dict: dict, ljust=True):
     for old_public_key, new_public_key in key_dict.items():
         new_initrd = replace_key(old_public_key, new_public_key, new_initrd, 'initrd')
     preset = 6
-    while True:
-        new_initrd_xz = lzma.compress(new_initrd, check=lzma.CHECK_CRC32, filters=[{"id": lzma.FILTER_LZMA2, "preset": preset | lzma.PRESET_EXTREME}])
-        print(f'preset:{preset},initrd xz new size:{len(new_initrd_xz)},old size:{len(initrd_xz)}')
+    new_initrd_xz = lzma.compress(new_initrd, check=lzma.CHECK_CRC32, filters=[{"id": lzma.FILTER_LZMA2, "preset": preset}])
+    while len(new_initrd_xz) > len(initrd_xz) and preset < 9:
+        print(f'preset:{preset}')
+        print(f'new initrd xz size:{len(new_initrd_xz)}')
+        print(f'old initrd xz size:{len(initrd_xz)}')
         preset += 1
-        if len(new_initrd_xz) <= len(initrd_xz) or preset > 9:
-            break
+        new_initrd_xz = lzma.compress(new_initrd, check=lzma.CHECK_CRC32, filters=[{"id": lzma.FILTER_LZMA2, "preset": preset}])
     if len(new_initrd_xz) > len(initrd_xz):
-        new_initrd_xz = lzma.compress(
-            new_initrd,
-            check=lzma.CHECK_CRC32,
-            filters=[{
-                "id": lzma.FILTER_LZMA2,
-                "lc": 2,
-                "lp": 2,
-                "pb": 3,
-                "mf": lzma.MF_BT4,
-            }]
-        )
-        print(f'initrd xz new size:{len(new_initrd_xz)},old size:{len(initrd_xz)}')
-    assert len(new_initrd_xz) <= len(initrd_xz), 'new initrd xz size is too big'
+        new_initrd_xz = lzma.compress(new_initrd, check=lzma.CHECK_CRC32, filters=[{"id": lzma.FILTER_LZMA2, "preset": 9 | lzma.PRESET_EXTREME, 'dict_size': 32*1024*1024, "lc": 4, "lp": 0, "pb": 0}])
     if ljust:
-        print(f'ljust size:{len(initrd_xz) - len(new_initrd_xz)}')
+        print(f'preset:{preset}')
+        print(f'new initrd xz size:{len(new_initrd_xz)}')
+        print(f'old initrd xz size:{len(initrd_xz)}')
+        print(f'ljust size:{len(initrd_xz)-len(new_initrd_xz)}')
+        assert len(new_initrd_xz) <= len(initrd_xz), 'new initrd xz size is too big'
         new_initrd_xz = new_initrd_xz.ljust(len(initrd_xz), b'\0')
     return new_initrd_xz
-
 
 def find_7zXZ_data(data: bytes):
     offset1 = 0
@@ -181,15 +168,13 @@ def find_7zXZ_data(data: bytes):
     while b'\x00\x00\x00\x00\x01\x59\x5A' in _data:
         offset2 = offset2 + _data.index(b'\x00\x00\x00\x00\x01\x59\x5A') + 7
         _data = _data[offset2:]
-    print(f'found 7zXZ data offset:{offset1} size:{offset2 - offset1}')
+    print(f'found 7zXZ data offset:{offset1} size:{offset2-offset1}')
     return data[offset1:offset2]
-
 
 def patch_elf(data: bytes, key_dict: dict):
     initrd_xz = find_7zXZ_data(data)
     new_initrd_xz = patch_initrd_xz(initrd_xz, key_dict)
     return data.replace(initrd_xz, new_initrd_xz)
-
 
 def patch_pe(data: bytes, key_dict: dict):
     vmlinux_xz = find_7zXZ_data(data)
@@ -203,66 +188,17 @@ def patch_pe(data: bytes, key_dict: dict):
     assert len(new_vmlinux_xz) <= len(vmlinux_xz), 'new vmlinux xz size is too big'
     print(f'new vmlinux xz size:{len(new_vmlinux_xz)}')
     print(f'old vmlinux xz size:{len(vmlinux_xz)}')
-    print(f'ljust size:{len(vmlinux_xz) - len(new_vmlinux_xz)}')
+    print(f'ljust size:{len(vmlinux_xz)-len(new_vmlinux_xz)}')
     new_vmlinux_xz = new_vmlinux_xz.ljust(len(vmlinux_xz), b'\0')
     new_data = data.replace(vmlinux_xz, new_vmlinux_xz)
     return new_data
 
-
-def build_efi(input_file, output_file):
-    def find_xz_streams(data: bytes):
-        streams = []
-        XZ_HEADER_MAGIC = b'\xFD7zXZ\x00\x00\x01'
-        XZ_FOOTER_MAGIC = b'\x00\x00\x00\x00\x01\x59\x5A'
-        i = 0
-        while True:
-            start = data.find(XZ_HEADER_MAGIC, i)
-            if start == -1:
-                break
-            end = data.find(XZ_FOOTER_MAGIC, start)
-            assert end != -1, 'XZ footer not found'
-            end += len(XZ_FOOTER_MAGIC)
-            streams.append((start, end))
-            i = end
-        return streams
-
-    with open(input_file, 'rb') as f:
-        elf = ELFFile(f)
-        initrd_section = elf.get_section_by_name('initrd')
-        assert initrd_section is not None, 'initrd section not found'
-        initrd_data = initrd_section.data()
-        xz_streams = find_xz_streams(initrd_data)
-        assert len(xz_streams) == 2, 'only support 2 xz streams'
-        efi_xz = initrd_data[xz_streams[0][0]:xz_streams[0][1]]
-        cpio_xz = initrd_data[xz_streams[1][0]:xz_streams[1][1]]
-        try:
-            efi = lzma.decompress(efi_xz)
-        except Exception as e:
-            print(f'size:{len(efi_xz)},header:{efi_xz[:20].hex().upper()},footer:{efi_xz[-20:].hex().upper()}\n')
-            raise Exception(f'failed to decompress efi: {e}')
-
-        with pefile.PE(data=efi) as pe:
-            data_section = [section for section in pe.sections if section.Name == b'.data\x00\x00\x00'][0]
-            rva = data_section.VirtualAddress
-            addr = data_section.PointerToRawData
-            data = data_section.get_data()
-            size = len(data)
-            alignment = ((rva + size) + 4096 - 1) & ~(4096 - 1)  # 4096对齐
-            alignment = alignment - (rva + size)
-            new_data = data + b'\x00' * alignment
-            new_data += struct.pack('<I', len(cpio_xz))
-            new_data += cpio_xz
-            data_section.SizeOfRawData = len(new_data)
-            new_file_data = pe.write()
-            new_file_data = new_file_data[:addr]
-            new_file_data += new_data
-            with open(output_file, 'wb') as f_out:
-                f_out.write(new_file_data)
-
-
 def patch_netinstall(key_dict: dict, input_file, output_file=None):
     netinstall = open(input_file, 'rb').read()
     if netinstall[:2] == b'MZ':
+        from package import check_install_package
+        check_install_package(['pefile'])
+        import pefile
         ROUTEROS_BOOT = {
             129: {'arch': 'power', 'name': 'Powerboot'},
             130: {'arch': 'e500', 'name': 'e500_boot'},
@@ -316,7 +252,7 @@ def patch_netinstall(key_dict: dict, input_file, output_file=None):
                 text_section_addr = addr
                 text_section_offset = offset
                 break
-        offset = re.search(rb'\x83\x00\x00\x00.{12}\x8A\x00\x00\x00.{12}\x81\x00\x00\x00.{12}', netinstall).start()
+        offset = re.search(rb'\x83\x00\x00\x00.{12}\x8A\x00\x00\x00.{12}\x81\x00\x00\x00.{12}', netinstall, re.DOTALL).start()
         print(f'found bootloaders offset {hex(offset)}')
         for i in range(10):
             id, name_ptr, data_ptr, data_size = struct.unpack_from('<IIII', netinstall[offset + i * 16:offset + i * 16 + 16])
@@ -337,7 +273,6 @@ def patch_netinstall(key_dict: dict, input_file, output_file=None):
             netinstall = netinstall.replace(data, new_data)
         open(output_file or input_file, 'wb').write(netinstall)
 
-
 def patch_kernel(data: bytes, key_dict):
     if data[:2] == b'MZ':
         print('patching EFI Kernel')
@@ -352,230 +287,113 @@ def patch_kernel(data: bytes, key_dict):
         return patch_elf(data, key_dict)
     elif data[:5] == b'\xFD7zXZ':
         print('patching initrd')
-        return patch_initrd_xz(data, key_dict, False)
+        return patch_initrd_xz(data, key_dict)
     else:
         raise Exception('unknown kernel format')
 
-
-def patch_loader(loader_file):
+def patch_loader(loader_file, key_dict):
     try:
-        from loader.patch_loader import patch_loader as do_patch_loader
-        arch = os.getenv('ARCH') or 'x86'
-        arch = arch.replace('-', '')
-        do_patch_loader(loader_file,loader_file,arch)
-    except ImportError as e:
-        print(e)
-        print("loader module import failed. cannot run patch_loader.py")
-
+        data = open(loader_file, 'rb').read()
+        original_size = len(data)
+        print(f'Patching loader: {loader_file} (size: {original_size} bytes)')
+        
+        for old_public_key, new_public_key in key_dict.items():
+            _data = replace_key(old_public_key, new_public_key, data, loader_file)
+            if _data != data:
+                data = _data
+                print(f'Successfully patched loader with new keys')
+            else:
+                print(f'No changes needed for loader (keys may already be patched)')
+        
+        if data != open(loader_file, 'rb').read():
+            open(loader_file, 'wb').write(data)
+            print(f'Loader patched successfully: {loader_file}')
+        else:
+            print(f'Loader unchanged: {loader_file}')
+            
+    except Exception as e:
+        print(f'Error patching loader: {e}')
 
 def patch_squashfs(path, key_dict):
-    url_replacements = {
-        os.environ.get('MIKRO_LICENCE_URL', '').encode(): os.environ.get('CUSTOM_LICENCE_URL', '').encode(),
-        os.environ.get('MIKRO_UPGRADE_URL', '').encode(): os.environ.get('CUSTOM_UPGRADE_URL', '').encode(),
-        os.environ.get('MIKRO_CLOUD_URL', '').encode(): os.environ.get('CUSTOM_CLOUD_URL', '').encode(),
-        os.environ.get('MIKRO_CLOUD2_URL', '').encode(): os.environ.get('CUSTOM_CLOUD2_URL', '').encode(),
-        os.environ.get('MIKRO_CLOUD_PUBLIC_KEY', '').encode(): os.environ.get('CUSTOM_CLOUD_PUBLIC_KEY', '').encode(),
-    }
-    url_replacements = {k: v for k, v in url_replacements.items() if k and v}
-    renew_replacements = {
-        os.environ.get('MIKRO_RENEW_URL', '').encode(): os.environ.get('CUSTOM_RENEW_URL', '').encode(),
-    }
-    renew_replacements = {k: v for k, v in renew_replacements.items() if k and v}
-
     for root, dirs, files in os.walk(path):
-        if 'mode' in files and 'keyman' in files:
-            for file_path in [os.path.join(root, 'mode'), os.path.join(root, 'keyman')]:
-                with open(file_path, 'rb') as f:
-                    data = f.read()
-                for old_url, new_url in url_replacements.items():
-                    if old_url in data:
-                        print(f'{file_path} url patched {old_url.decode()[:7]}...')
-                        data = data.replace(old_url, new_url)
+        for _file in files:
+            file = os.path.join(root, _file)
+            if os.path.isfile(file):
+                if _file == 'loader':
+                    print(f'Patching loader in squashfs: {file}')
+                    patch_loader(file, key_dict)
+                    continue
+                    
+                if _file == 'BOOTX64.EFI':
+                    print(f'patch {file} ...')
+                    data = open(file, 'rb').read()
+                    data = patch_kernel(data, key_dict)
+                    open(file, 'wb').write(data)
+                    continue
+                data = open(file, 'rb').read()
                 for old_public_key, new_public_key in key_dict.items():
-                    new_data = replace_key(old_public_key, new_public_key, data, file_path)
-                    if new_data != data:
-                        data = new_data
-                with open(f'{file_path}_', 'wb') as f:
-                    f.write(data)
-
-        if 'loader' in files and os.path.isfile(os.path.join(root, 'loader')):
-            loader_file = os.path.join(root, 'loader')
-            
-            # ALWAYS use working loader from repo if available (contains 7.25 original Mikrotik loader)
-            loader_src = os.path.join(os.getcwd(), "loader", "loader.bin")
-            if os.path.isfile(loader_src):
-                try:
-                    import shutil
-                    shutil.copy2(loader_src, loader_file)
-                    print(f'✅ Copied loader from repo ({os.path.getsize(loader_src)} bytes)')
-                    
-                    # Patch loader with custom keys (7.25+ requires this!)
-                    patch_loader(loader_file)
-                    print(f'✅ Loader patched with custom keys')
-                    
-                except Exception as copy_err:
-                    print(f'❌ Failed to copy/patch loader: {copy_err}')
-                    # Fallback: fix interpreter on original loader
-                    try:
-                        import subprocess
-                        result = subprocess.run(['patchelf', '--set-interpreter', '/lib/libc.so', loader_file], 
-                                              capture_output=True, text=True, timeout=10)
-                        if result.returncode == 0:
-                            print('✅ loader interpreter set to /lib/libc.so')
-                        else:
-                            print(f'patchelf failed: {result.stderr}')
-                    except Exception as e:
-                        print(f'⚠️  patchelf error: {e}')
-            else:
-                # No loader in repo, fix interpreter on original loader
-                print('⚠️  loader/loader.bin not found in repo, fixing interpreter on original')
-                try:
-                    import subprocess
-                    result = subprocess.run(['patchelf', '--set-interpreter', '/lib/libc.so', loader_file], 
-                                          capture_output=True, text=True, timeout=10)
-                    if result.returncode == 0:
-                        print('✅ loader interpreter set to /lib/libc.so')
-                    else:
-                        print(f'patchelf failed: {result.stderr}')
-                except Exception as e:
-                    print(f'⚠️  patchelf error: {e}')
-
-        if 'BOOTX64.EFI' in files and os.path.isfile(os.path.join(root, 'BOOTX64.EFI')):
-            efi_file = os.path.join(root, 'BOOTX64.EFI')
-            with open(efi_file, 'rb') as f:
-                data = f.read()
-            new_data = patch_kernel(data, key_dict)
-            assert new_data != data, f'{efi_file} key not patched'
-            with open(efi_file, 'wb') as f:
-                f.write(new_data)
-
-        for filename in files:
-            if filename in ['mode', 'keyman', 'loader', 'BOOTX64.EFI']:
-                continue
-            file_path = os.path.join(root, filename)
-            if not os.path.isfile(file_path):
-                continue
-
-            modified = False
-            with open(file_path, 'rb') as f:
-                data = f.read()
-
-            for old_public_key, new_public_key in key_dict.items():
-                new_data = replace_key(old_public_key, new_public_key, data, file_path)
-                if new_data != data:
-                    data = new_data
-                    modified = True
-
-            for old_url, new_url in url_replacements.items():
-                if old_url in data:
-                    print(f'{file_path} url patched {old_url.decode()[:7]}...')
-                    data = data.replace(old_url, new_url)
-                    modified = True
-
-            if filename == 'licupgr':
-                for old_url, new_url in renew_replacements.items():
+                    _data = replace_key(old_public_key, new_public_key, data, file)
+                    if _data != data:
+                        open(file, 'wb').write(_data)
+                url_dict = {
+                    os.environ['MIKRO_LICENCE_URL'].encode(): os.environ['CUSTOM_LICENCE_URL'].encode(),
+                    os.environ['MIKRO_UPGRADE_URL'].encode(): os.environ['CUSTOM_UPGRADE_URL'].encode(),
+                    os.environ['MIKRO_CLOUD_URL'].encode(): os.environ['CUSTOM_CLOUD_URL'].encode(),
+                    os.environ['MIKRO_CLOUD_PUBLIC_KEY'].encode(): os.environ['CUSTOM_CLOUD_PUBLIC_KEY'].encode(),
+                }
+                data = open(file, 'rb').read()
+                for old_url, new_url in url_dict.items():
                     if old_url in data:
-                        print(f'{file_path} url patched {old_url.decode()[:7]}...')
+                        print(f'{file} url patched {old_url.decode()[:7]}...')
                         data = data.replace(old_url, new_url)
-                        modified = True
-
-            if modified:
-                with open(file_path, 'wb') as f:
-                    f.write(data)
-
+                        open(file, 'wb').write(data)
+                        
+                if os.path.split(file)[1] == 'licupgr':
+                    url_dict = {
+                        os.environ['MIKRO_RENEW_URL'].encode(): os.environ['CUSTOM_RENEW_URL'].encode(),
+                    }
+                    for old_url, new_url in url_dict.items():
+                        if old_url in data:
+                            print(f'{file} url patched {old_url.decode()[:7]}...')
+                            data = data.replace(old_url, new_url)
+                            open(file, 'wb').write(data)
 
 def run_shell_command(command):
     process = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     return process.stdout, process.stderr
 
-
 def patch_npk_package(package, key_dict):
     if package[NpkPartID.NAME_INFO].data.name == 'system':
         file_container = NpkFileContainer.unserialize_from(package[NpkPartID.FILE_CONTAINER].data)
-        
-        # Get repo root from script location
-        repo_root = os.path.dirname(os.path.abspath(__file__))
-        
         for item in file_container:
             if item.name in [b'boot/EFI/BOOT/BOOTX64.EFI', b'boot/kernel', b'boot/initrd.rgz']:
-                item_name = item.name.decode()
-                print(f'processing {item_name} ...')
-                
-                # Check if kernel/initramfs exists in repo
-                repo_kernel_path = os.path.join(repo_root, 'kernel', item_name)
-                repo_initramfs_path = os.path.join(repo_root, 'kernel', 'initramfs.xz')
-                
-                print(f'  repo_root: {repo_root}')
-                print(f'  checking: {repo_kernel_path}')
-                
-                if item_name == 'initrd.rgz' and os.path.isfile(repo_initramfs_path):
-                    # Copy initramfs from repo, then patch key
-                    print(f'✅ copying initramfs from repo ({os.path.getsize(repo_initramfs_path)} bytes)...')
-                    with open(repo_initramfs_path, 'rb') as f:
-                        item.data = f.read()
-                    # Patch public key in initramfs
-                    item.data = patch_initrd_xz(item.data, key_dict, False)
-                    print(f'✅ initramfs key patched')
-                elif item_name in ['EFI/BOOT/BOOTX64.EFI', 'kernel'] and os.path.isfile(repo_kernel_path):
-                    # Copy kernel from repo, then patch key
-                    print(f'✅ copying kernel from repo ({os.path.getsize(repo_kernel_path)} bytes)...')
-                    with open(repo_kernel_path, 'rb') as f:
-                        item.data = f.read()
-                    # Patch kernel with key_dict
-                    item.data = patch_kernel(item.data, key_dict)
-                    print(f'✅ kernel key patched')
-                else:
-                    # Fallback to patching original data
-                    print(f'⚠️ kernel/initramfs not found in repo, patching original {item_name} ...')
-                    item.data = patch_kernel(item.data, key_dict)
+                print(f'patch {item.name} ...')
+                item.data = patch_kernel(item.data, key_dict)
         package[NpkPartID.FILE_CONTAINER].data = file_container.serialize()
-        
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            squashfs_file = os.path.join(tmp_dir, 'squashfs-root.sfs')
-            extract_dir = os.path.join(tmp_dir, 'squashfs-root')
-            with open(squashfs_file, 'wb') as f:
-                f.write(package[NpkPartID.SQUASHFS].data)
-            print(f"extract {squashfs_file} ...")
-            run_shell_command(f"unsquashfs -d {extract_dir} {squashfs_file}")
-            patch_squashfs(extract_dir, key_dict)
 
-            # Update atau timpa logo.txt sebelum mksquashfs
-            logo_src = os.path.join(os.getcwd(), "logo.txt")
-            logo_dst = os.path.join(extract_dir, "nova/lib/console/logo.txt")
-            if os.path.exists(logo_src):
-                run_shell_command(f"cp {logo_src} {logo_dst}")
-                run_shell_command(f"chmod 755 {logo_dst}")
-                print(f"copied logo.txt -> {logo_dst}")
-            else:
-                print("⚠️ logo.txt file not found, applying default sed patch...")
-                run_shell_command(f"sed -i '1d' {logo_dst}")
-                run_shell_command(f"sed -i '8s#.*#  elseif@live.cn     https://github.com/elseif/MikroTikPatch#' {logo_dst}")
+        squashfs_file = 'squashfs-root.sfs'
+        extract_dir = 'squashfs-root'
+        open(squashfs_file, 'wb').write(package[NpkPartID.SQUASHFS].data)
+        print(f"extract {squashfs_file} ...")
+        run_shell_command(f"unsquashfs -d {extract_dir} {squashfs_file}")
+        patch_squashfs(extract_dir, key_dict)
 
-            # FIX: Patch loader interpreter path to /lib/libc.so (NO REPLACE, PATCH IN-PLACE)
-            # SKIP if loader already copied from repo (elseif loader already has correct interpreter)
-            loader_binary = os.path.join(extract_dir, "nova/bin/loader")
-            loader_repo = os.path.join(os.getcwd(), "loader")
-            
-            if os.path.exists(loader_binary) and not os.path.isfile(loader_repo):
-                # Only patch if loader NOT from repo (repo loader already correct)
-                print(f"fixing loader interpreter path...")
-                try:
-                    # Change interpreter to /lib/libc.so (standard RouterOS path)
-                    run_shell_command(f"patchelf --set-interpreter /lib/libc.so {loader_binary}")
-                    print(f"✅ loader interpreter set to /lib/libc.so")
-                except Exception as e:
-                    print(f"⚠️  loader interpreter fix failed: {e}")
-            elif os.path.exists(loader_binary) and os.path.isfile(loader_repo):
-                print(f"✅ loader already copied from repo - skipping patchelf (already has correct interpreter)")
-            else:
-                print("⚠️  loader not found, skipping interpreter fix")
+        logo_src = os.path.join(os.getcwd(), "logo.txt")
+        logo_dst = os.path.join(extract_dir, "nova/lib/console/logo.txt")
+        if os.path.exists(logo_src):
+            run_shell_command(f"cp {logo_src} {logo_dst}")
+            run_shell_command(f"chmod 755 {logo_dst}")
+            print(f"copied logo -> {logo_dst}")
+        else:
+            print("⚠️ logo.txt file not found, skipping copy...")
 
-            # Kemas kembali ke SquashFS setelah semua file disalin
-            print(f"pack {extract_dir} ...")
-            run_shell_command(f"mksquashfs {extract_dir} {squashfs_file} -no-recovery -noappend -exit-on-error -quiet -comp xz -no-xattrs -b 256k -all-root")
-            with open(squashfs_file, 'rb') as f:
-                package[NpkPartID.SQUASHFS].data = f.read()
-
+        print(f"pack {extract_dir} ...")
+        run_shell_command(f"rm -f {squashfs_file}")
+        run_shell_command(f"mksquashfs {extract_dir} {squashfs_file} -quiet -comp xz -no-xattrs -b 256k")
+        print(f"clean ...")
+        run_shell_command(f"rm -rf {extract_dir}")
+        package[NpkPartID.SQUASHFS].data = open(squashfs_file, 'rb').read()
+        run_shell_command(f"rm -f {squashfs_file}")
 
 def patch_npk_file(key_dict, kcdsa_private_key, eddsa_private_key, input_file, output_file=None):
     npk = NovaPackage.load(input_file)
@@ -587,7 +405,6 @@ def patch_npk_file(key_dict, kcdsa_private_key, eddsa_private_key, input_file, o
     npk.sign(kcdsa_private_key, eddsa_private_key)
     npk.save(output_file or input_file)
 
-
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='MikroTik patcher')
@@ -598,9 +415,9 @@ if __name__ == '__main__':
     kernel_parser = subparsers.add_parser('kernel', help='patch kernel file')
     kernel_parser.add_argument('input', type=str, help='Input file')
     kernel_parser.add_argument('-O', '--output', type=str, help='Output file')
-    buildefi_parser = subparsers.add_parser('buildefi', help='build efi file')
-    buildefi_parser.add_argument('input', type=str, help='kernel file')
-    buildefi_parser.add_argument('output', type=str, help='Output to file')
+    block_parser = subparsers.add_parser('block', help='patch block file')
+    block_parser.add_argument('dev', type=str, help='block device')
+    block_parser.add_argument('file', type=str, help='file path')
     netinstall_parser = subparsers.add_parser('netinstall', help='patch netinstall file')
     netinstall_parser.add_argument('input', type=str, help='Input file')
     netinstall_parser.add_argument('-O', '--output', type=str, help='Output file')
@@ -618,9 +435,9 @@ if __name__ == '__main__':
         print(f'patching {args.input} ...')
         data = patch_kernel(open(args.input, 'rb').read(), key_dict)
         open(args.output or args.input, 'wb').write(data)
-    elif args.command == 'buildefi':
-        print(f'building EFI from {args.input} ...')
-        build_efi(args.input, args.output)
+    elif args.command == 'block':
+        print(f'patching {args.file} in {args.dev} ...')
+        patch_block(args.dev, args.file, key_dict)
     elif args.command == 'netinstall':
         print(f'patching {args.input} ...')
         patch_netinstall(key_dict, args.input, args.output)
