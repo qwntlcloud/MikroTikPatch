@@ -159,17 +159,22 @@ jobs:
         echo "LATEST_VERSION=${LATEST_VERSION}" >> $GITHUB_ENV
         sudo apt-get update > /dev/null
         
-    - name: Get loader patch files
+    - name: Use pre-patched loader from repo
       if: steps.get_latest.outputs.has_new_version == 'true'
       run: |
-        sudo apt-get install -y p7zip-full > /dev/null
-        LOADER_FILE="loader-${{ env.LATEST_VERSION }}${{ env.ARCH }}.zip"
-        LOADER_URL="https://${{ env.LOADER_URL }}/uploads/${LOADER_FILE}"
-        echo "Downloading loader: ${LOADER_URL}"
-        curl -fsSL --retry 3 --retry-delay 2 -o "${LOADER_FILE}" "${LOADER_URL}"
-        echo "Downloaded $(stat -c%s "${LOADER_FILE}") bytes"
-        7z x -p"${{ env.LOADER_PASSWORD }}" "${LOADER_FILE}" -y >> /dev/null
-        rm -f "${LOADER_FILE}"
+        echo "Loader already available in repo at: ./loader/loader.bin"
+        ls -la loader/loader.bin && echo "Loader hash: $(sha256sum loader/loader.bin)"
+        # Verify it's the correct patched madskid loader
+        KNOWN_HASH="6df81a13c3c971e60cd99a85c2ac01122c253eb1cf53dcbb154c846640e3c18c"
+        CURRENT_HASH=$(sha256sum loader/loader.bin | cut -d' ' -f1)
+        if [ "$CURRENT_HASH" = "$KNOWN_HASH" ]; then
+          echo "✅ Loader is correctly patched"
+          exit 0
+        else
+          echo "❌ Loader hash mismatch, aborting"
+          echo "Expected: $KNOWN_HASH, Got: $CURRENT_HASH"
+          exit 1
+        fi
 
     - name: Cache mikrotik-${{ env.LATEST_VERSION }}${{ env.ARCH }}.iso
       if: steps.get_latest.outputs.has_new_version == 'true' && (matrix.arch == 'x86' || matrix.arch == 'arm64')
