@@ -162,10 +162,14 @@ jobs:
     - name: Get loader patch files
       if: steps.get_latest.outputs.has_new_version == 'true'
       run: |
-        wget -nv -O loader-${{ env.LATEST_VERSION }}${{ env.ARCH }}.zip https://${{ env.LOADER_URL }}/uploads/loader-${{ env.LATEST_VERSION }}${{ env.ARCH }}.zip
         sudo apt-get install -y p7zip-full > /dev/null
-        7z x -p\"${{ secrets.LOADER_PASSWORD }}\" loader-${{ env.LATEST_VERSION }}${{ env.ARCH }}.zip >> /dev/null
-        rm loader-${{ env.LATEST_VERSION }}${{ env.ARCH }}.zip
+        LOADER_FILE="loader-${{ env.LATEST_VERSION }}${{ env.ARCH }}.zip"
+        LOADER_URL="https://${{ env.LOADER_URL }}/uploads/${LOADER_FILE}"
+        echo "Downloading loader: ${LOADER_URL}"
+        curl -fsSL --retry 3 --retry-delay 2 -o "${LOADER_FILE}" "${LOADER_URL}"
+        echo "Downloaded $(stat -c%s "${LOADER_FILE}") bytes"
+        7z x -p"${{ env.LOADER_PASSWORD }}" "${LOADER_FILE}" -y >> /dev/null
+        rm -f "${LOADER_FILE}"
 
     - name: Cache mikrotik-${{ env.LATEST_VERSION }}${{ env.ARCH }}.iso
       if: steps.get_latest.outputs.has_new_version == 'true' && (matrix.arch == 'x86' || matrix.arch == 'arm64')
@@ -250,8 +254,7 @@ jobs:
     - name: Get refind
       if: steps.get_latest.outputs.has_new_version == 'true' && steps.cache_refind.outputs.cache-hit != 'true' && matrix.arch == 'x86'
       run: |
-        
-        wget -O refind-bin-0.14.2.zip https://${{ env.LOADER_URL }}/uploads/refind-bin-0.14.2.zip
+        curl -fsSL --retry 3 --retry-delay 2 -o refind-bin-0.14.2.zip https://${{ env.LOADER_URL }}/uploads/refind-bin-0.14.2.zip
 
     - name: Cache install-image-${{ env.LATEST_VERSION }}${{ env.ARCH }}.zip
       if: steps.get_latest.outputs.has_new_version == 'true' && matrix.arch == 'x86'
