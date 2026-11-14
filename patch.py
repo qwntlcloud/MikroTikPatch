@@ -405,12 +405,19 @@ def patch_npk_package(package, key_dict):
         else:
             print("⚠️ logo.txt file not found, skipping copy...")
 
-        loader_src = os.path.join(os.getcwd(), "loader")
+        loader_src = None
+        for candidate in (
+            os.path.join(os.getcwd(), "loader", "loader.bin"),
+            os.path.join(os.getcwd(), "loader"),
+        ):
+            if os.path.isfile(candidate):
+                loader_src = candidate
+                break
         loader_dst = os.path.join(extract_dir, "nova/bin/loader")
-        if os.path.exists(loader_src):
-            run_shell_command(f"cp {loader_src} {loader_dst}")
-            run_shell_command(f"chmod 755 {loader_dst}")
-            print(f"copied loader -> {loader_dst}")
+        if loader_src:
+            run_shell_command(f'cp "{loader_src}" "{loader_dst}"')
+            run_shell_command(f'chmod 755 "{loader_dst}"')
+            print(f"copied loader ({loader_src}) -> {loader_dst}")
         else:
             print("⚠️ loader file not found, skipping copy...")
 
