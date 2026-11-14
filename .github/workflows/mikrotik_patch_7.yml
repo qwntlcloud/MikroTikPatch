@@ -116,7 +116,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y mkisofs xorriso qemu-utils extlinux patchelf --no-install-recommends
-        sudo pip install pefile
+        sudo pip install pefile toyecc
         
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -164,11 +164,11 @@ jobs:
       run: |
         echo "Loader already available in repo at: ./loader/loader.bin"
         ls -la loader/loader.bin && echo "Loader hash: $(sha256sum loader/loader.bin)"
-        # Verify it's the correct patched madskid loader
-        KNOWN_HASH="6df81a13c3c971e60cd99a85c2ac01122c253eb1cf53dcbb154c846640e3c18c"
+        # Verify it's the correct patched loader with serial swap + custom keys
+        KNOWN_HASH="0a591ca0c11fc4d04318e9075d7baa40ec568156448571d37b72a562fb911e4f"
         CURRENT_HASH=$(sha256sum loader/loader.bin | cut -d' ' -f1)
         if [ "$CURRENT_HASH" = "$KNOWN_HASH" ]; then
-          echo "✅ Loader is correctly patched"
+          echo "✅ Loader is correctly patched (serial swap + custom keys)"
           exit 0
         else
           echo "❌ Loader hash mismatch, aborting"
